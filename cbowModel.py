@@ -11,8 +11,11 @@ import time
 
 # 数据集采样自华尔街日报，没有标点符号，<unk>表示未知，N表示数字
 # 数据预处理函数，包括建立词典，删除低频词，二次采样，负采样
+checkPointDir = 'checkpoint/'
+dataFile = 'ptb.train.txt'
+preProcessFile = 'data_CBOW.txt'
 def preProcess(negative_num=25, max_window_size=5):
-    with open('data/ptb.train.txt', 'r') as f:
+    with open('data/'+dataFile, 'r') as f:
         lines = f.readlines()
         raw_dataset = [st.split() for st in lines]  # 二维列表(sentences, words)
     counter = collections.Counter([word for st in raw_dataset for word in st])
@@ -20,8 +23,8 @@ def preProcess(negative_num=25, max_window_size=5):
     # 建立索引
     idx_to_token = [i for i in counter.keys()]
     token_to_idx = {tk: idx for idx, tk in enumerate(idx_to_token)}
-    if os.path.exists(checkPointDir + 'data_CBOW.txt'):
-        with open(checkPointDir + 'data_CBOW.txt', 'rb') as f:
+    if os.path.exists(checkPointDir + preProcessFile):
+        with open(checkPointDir + preProcessFile, 'rb') as f:
             all_centers, all_contexts, all_negatives = pickle.load(f)
     else:
         # 使用索引数字替换raw_dataset中的单词
@@ -72,7 +75,7 @@ def preProcess(negative_num=25, max_window_size=5):
 
         sampling_weights = [counter[w] ** 0.75 for w in idx_to_token]
         all_negatives = get_negatives(all_contexts, sampling_weights, negative_num)
-        with open(checkPointDir + 'data_CBOW.txt', 'wb') as f:
+        with open(checkPointDir + preProcessFile, 'wb') as f:
             pickle.dump((all_centers, all_contexts, all_negatives), f)
 
     # 定义数据迭代
@@ -151,7 +154,6 @@ class SigmoidBinaryCrossEntropyLoss(nn.Module):
 
 
 negative_num, max_window_size = 25, 5 # 分别是负采样的个数（应该为context长度*K），context窗口最大值
-checkPointDir = "checkpoint/"
 start_time = time.time()
 data_iter, idx_to_token, token_to_idx = preProcess(negative_num, max_window_size)
 print("pretrain time: " + str(time.time() - start_time))

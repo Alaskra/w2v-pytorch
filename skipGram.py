@@ -13,7 +13,9 @@ sys.path.append("..")
 print(torch.__version__)
 
 checkPointDir = 'checkpoint/'
-with open('./data/ptb.train.txt', 'r') as f:
+dataFile = 'ptb.train.txt'
+preProcessFile = 'data_SG.txt'
+with open('data/'+dataFile, 'r') as f:
     lines = f.readlines()
     # st是sentence的缩写
     raw_dataset = [st.split() for st in lines]
@@ -23,8 +25,8 @@ counter = collections.Counter([tk for st in raw_dataset for tk in st])
 counter = dict(filter(lambda x: x[1] >= 3, counter.items()))
 idx_to_token = [tk for tk, _ in counter.items()]
 token_to_idx = {tk: idx for idx, tk in enumerate(idx_to_token)}
-if os.path.exists(checkPointDir + 'data_SG.txt'):
-    with open(checkPointDir + 'data_SG.txt', 'rb') as f:
+if os.path.exists(checkPointDir + preProcessFile):
+    with open(checkPointDir + preProcessFile, 'rb') as f:
         all_centers, all_contexts, all_negatives = pickle.load(f)
 else:
     dataset = [[token_to_idx[tk] for tk in st if tk in token_to_idx]
@@ -79,7 +81,7 @@ else:
 
     sampling_weights = [counter[w] ** 0.75 for w in idx_to_token]
     all_negatives = get_negatives(all_contexts, sampling_weights, 5)
-    with open(checkPointDir + 'data_SG.txt', 'wb') as f:
+    with open(checkPointDir + preProcessFile, 'wb') as f:
         pickle.dump((all_centers, all_contexts, all_negatives), f)
 
 
