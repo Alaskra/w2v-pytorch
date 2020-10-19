@@ -8,18 +8,19 @@ import math
 import random
 import time
 
-
 # 数据集采样自华尔街日报，没有标点符号，<unk>表示未知，N表示数字
 # 数据预处理函数，包括建立词典，删除低频词，二次采样，负采样
 checkPointDir = 'checkpoint/'
 dataFile = 'ptb.train.txt'
 preProcessFile = 'data_CBOW.txt'
-def preProcess(negative_num=25, max_window_size=5):
-    with open('data/'+dataFile, 'r') as f:
+
+
+def preProcess(negative_num=25, max_window_size=5, frequency_threshold=3):
+    with open('data/' + dataFile, 'r') as f:
         lines = f.readlines()
         raw_dataset = [st.split() for st in lines]  # 二维列表(sentences, words)
     counter = collections.Counter([word for st in raw_dataset for word in st])
-    counter = dict(filter(lambda x: x[1] >= 5, counter.items()))  # key是单词，value是出现次数（剔除了少于5次的单词）
+    counter = dict(filter(lambda x: x[1] >= frequency_threshold, counter.items()))  # key是单词，value是出现次数（剔除了少于5次的单词）
     # 建立索引
     idx_to_token = [i for i in counter.keys()]
     token_to_idx = {tk: idx for idx, tk in enumerate(idx_to_token)}
@@ -34,24 +35,37 @@ def preProcess(negative_num=25, max_window_size=5):
         # 二次采样,随机丢弃一些高频词
         def discard(idx):
             # 返回True表示丢弃，概率是p
-            p = max(0, 1 - math.sqrt(1e-4 / (counter[idx_to_token[idx]] / num_tokens)))
+            p = 1 - math.sqrt(1e-4 / (counter[idx_to_token[idx]] / num_tokens))
             return random.uniform(0, 1) < p
 
         subsampled_dataset = [[idx for idx in st if not discard(idx)] for st in dataset]
 
         # 获取中心词和背景词
+        # def get_centers_and_contexts(dataset, max_window_size):
+        #     centers, contexts = [], []
+        #     for st in dataset:
+        #         if len(st) < 2:
+        #             continue
+        #         for i in range(len(st)):
+        #             centers.append(st[i])
+        #             window_size = random.randint(1, max_window_size)
+        #             contexti = st[max(0, i - window_size): i] + st[i + 1: min(len(st), i + window_size + 1)]
+        #             contexts.append(contexti)
+        #     return centers, contexts
+
         def get_centers_and_contexts(dataset, max_window_size):
             centers, contexts = [], []
             for st in dataset:
-                if len(st) < 2:
+                if len(st) < 2:  # 每个句子至少要有2个词才可能组成一对“中心词-背景词”
                     continue
-                for i in range(len(st)):
-                    centers.append(st[i])
+                centers += st
+                for center_i in range(len(st)):
                     window_size = random.randint(1, max_window_size)
-                    contexti = st[max(0, i - window_size): i] + st[i + 1: min(len(st), i + window_size + 1)]
-                    contexts.append(contexti)
+                    indices = list(range(max(0, center_i - window_size),
+                                         min(len(st), center_i + 1 + window_size)))
+                    indices.remove(center_i)  # 将中心词排除在背景词之外
+                    contexts.append([st[idx] for idx in indices])
             return centers, contexts
-
         all_centers, all_contexts = get_centers_and_contexts(subsampled_dataset, max_window_size)
 
         # 负采样
@@ -153,7 +167,7 @@ class SigmoidBinaryCrossEntropyLoss(nn.Module):
         return res.mean(dim=1)
 
 
-negative_num, max_window_size = 25, 5 # 分别是负采样的个数（应该为context长度*K），context窗口最大值
+negative_num, max_window_size = 25, 5  # 分别是负采样的个数（应该为context长度*K），context窗口最大值
 start_time = time.time()
 data_iter, idx_to_token, token_to_idx = preProcess(negative_num, max_window_size)
 print("pretrain time: " + str(time.time() - start_time))
@@ -187,11 +201,11 @@ def train(net, lr, num_epochs):
               % (epoch + 1, l_sum / n, time.time() - start))
 
 
-if os.path.exists(checkPointDir+'cbow.pth'):
-    net.load_state_dict(torch.load(checkPointDir+'cbow.pth'))
+if os.path.exists(checkPointDir + 'cbow.pth'):
+    net.load_state_dict(torch.load(checkPointDir + 'cbow.pth'))
 else:
     train(net, 0.01, 10)
-    torch.save(net.state_dict(), checkPointDir+'cbow.pth')
+    torch.save(net.state_dict(), checkPointDir + 'cbow.pth')
 
 
 def get_similar_tokens(k, embed):

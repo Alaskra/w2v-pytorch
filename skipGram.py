@@ -15,12 +15,10 @@ print(torch.__version__)
 checkPointDir = 'checkpoint/'
 dataFile = 'ptb.train.txt'
 preProcessFile = 'data_SG.txt'
+# preProcessFile = 'data_CBOW.txt'
 with open('data/'+dataFile, 'r') as f:
     lines = f.readlines()
-    # st是sentence的缩写
     raw_dataset = [st.split() for st in lines]
-
-# tk是token的缩写
 counter = collections.Counter([tk for st in raw_dataset for tk in st])
 counter = dict(filter(lambda x: x[1] >= 3, counter.items()))
 idx_to_token = [tk for tk, _ in counter.items()]
@@ -66,6 +64,7 @@ else:
         for contexts in all_contexts:
             negatives = []
             while len(negatives) < len(contexts) * K:
+            # while len(negatives) < 5 * K:
                 if i == len(neg_candidates):
                     # 根据每个词的权重（sampling_weights）随机生成k个词的索引作为噪声词。
                     # 为了高效计算，可以将k设得稍大一点
